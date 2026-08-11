@@ -1,0 +1,62 @@
+[project]
+name = "provgraf"
+version = "0.1.0"
+description = "W3C PROV knowledge-graph engine on Postgres with automatic staleness propagation — a verified-facts bank for AI agents (proof of concept)"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "asyncpg>=0.30",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.5",
+    "typer>=0.12",
+    "rich>=13.7",
+    "pgvector>=0.3",
+]
+
+[project.scripts]
+provgraf = "provgraf.main:app"
+provgraf-mcp = "provgraf.mcp_server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/provgraf"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.7",
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+    "prov>=2.0",          # reference W3C implementation — validates the PROV-JSON export in tests
+]
+dashboard = [
+    "streamlit>=1.40",
+    "psycopg[binary]>=3.2",
+    "pandas>=2.2",
+]
+rag = [
+    "sentence-transformers>=3.0",
+    "torch>=2.2",
+]
+mcp = [
+    "mcp>=1.2",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = [
+    "B008",    # typer's API *requires* Option()/Argument() calls in argument defaults
+    "E702",    # short paired statements on one line are a deliberate style here
+    "SIM105",  # try/except/pass reads better than contextlib.suppress around lazy imports
+]
+
+[tool.ruff.lint.per-file-ignores]
+"dashboard/app.py" = ["E501"]   # Streamlit markdown/HTML blocks are unwrappable one-liners
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

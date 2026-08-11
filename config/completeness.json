@@ -1,0 +1,16 @@
+{
+    "_comment": "Required fields per type (FR-040). Key = client slug. Checked by `provgraf check`/completeness.",
+    "acme-housing": {
+        "prefix": "acme",
+        "investments": [
+            "riverside",
+            "hillside",
+            "lakeside"
+        ],
+        "required_fields": [
+            "units_phase1",
+            "rent",
+            "deposit"
+        ]
+    }
+}

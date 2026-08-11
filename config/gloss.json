@@ -1,0 +1,45 @@
+{
+  "_comment": "Field dictionary for auto-generated retrieval glosses (contextual retrieval). Key = field name (matched by equality or `prefix_`), value = concept description + query-phrase synonyms. The gloss embedded for a fact = desc + location (collections) + value + synonyms; provenance is deliberately EXCLUDED from the embedded text (it blurs the vector).",
+  "_default": {
+    "desc": "Fact from the client's verified-facts bank",
+    "syn": ""
+  },
+  "fields": {
+    "rent": {
+      "desc": "Monthly rent rate per square metre of an apartment",
+      "syn": "rent, rental rate, price per metre, monthly cost, how much rent"
+    },
+    "deposit": {
+      "desc": "Security deposit expressed as a multiple of the monthly rent",
+      "syn": "deposit, security deposit, how many months deposit"
+    },
+    "units": {
+      "desc": "Number of residential units in the development",
+      "syn": "apartments, units, flats, how many apartments, unit count"
+    },
+    "savings": {
+      "desc": "Cost saving achieved on the development (internal figure)",
+      "syn": "savings, cost reduction, budget saving"
+    },
+    "income_thresholds": {
+      "desc": "Income eligibility criteria for tenants",
+      "syn": "income thresholds, eligibility, income criteria, who qualifies"
+    },
+    "permit": {
+      "desc": "Building permit (administrative decision)",
+      "syn": "building permit, permit decision, planning approval, when was the permit issued"
+    },
+    "plot": {
+      "desc": "Cadastral plot of the development",
+      "syn": "plot, parcel, land, plot number, where is it built"
+    },
+    "capital": {
+      "desc": "Company share capital",
+      "syn": "share capital, equity, capitalisation"
+    },
+    "revenue": {
+      "desc": "Company revenue for a financial year",
+      "syn": "revenue, turnover, sales, how much revenue"
+    }
+  }
+}

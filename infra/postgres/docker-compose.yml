@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: provgraf-pg
+    hostname: postgres
+    ports:
+      - "5632:5432"            # provgraf dev
+    environment:
+      POSTGRES_DB: provgraf
+      POSTGRES_USER: provgraf
+      POSTGRES_PASSWORD: provgraf_local_dev
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - ./data:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U provgraf -d provgraf"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

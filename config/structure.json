@@ -1,0 +1,18 @@
+{
+  "_comment": "Binding layer (PROV-DM): collection nodes (prov:Collection) + hadMember. Generic, per-client. groups[].members = qname patterns (* → LIKE %) OR qnames of other collections (nesting = dual-role). questions[] = open structural questions (structure not 100% certain) with a resolution_path.",
+  "acme-housing": {
+    "groups": [
+      {"qname": "acme:inv.riverside", "kind": "investment", "label": "Riverside development", "members": ["acme:riverside.*"]},
+      {"qname": "acme:inv.hillside", "kind": "investment", "label": "Hillside development", "members": ["acme:hillside.*"]},
+      {"qname": "acme:inv.lakeside", "kind": "investment", "label": "Lakeside development", "members": ["acme:lakeside.*"]},
+      {"qname": "acme:company.finance", "kind": "finance", "label": "Company finances (statements + capital)", "members": ["acme:finance.*"]}
+    ],
+    "questions": [
+      {
+        "qname": "acme:q.hillside-phase2-permit",
+        "label": "Does Hillside phase 2 fall under the existing building permit or does it need its own?",
+        "resolution_path": "Confirm with the permitting office; attach the decision as a source document, then `provgraf resolve-question`."
+      }
+    ]
+  }
+}
