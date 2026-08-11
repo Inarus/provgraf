@@ -52,3 +52,43 @@ async def test_a_changed_source_lands_in_hard_stale(conn):
 
     assert [x["qname"] for x in r.hard] == ["t:total"]
     assert r.dangling == []       # the document's file exists
+
+
+async def test_testimony_without_a_file_is_fine_but_needs_who_and_when(conn):
+    """A spoken source is complete without a file — the record of who and when replaces it."""
+    pool = FakePool(conn)
+    aid = await db.upsert_agent(conn, "t:ceo", "person", "CEO")
+    doc = await db.insert_entity(
+        conn, qname="t:src.phonecall", provenance_class="source", kind="document",
+        scope="client", owner="t-client", attributed_to=aid,
+        value=json.dumps({"file": None, "date": "2026-07-23", "testimony": True}),
+        value_type="document", label="CEO confirmed on the phone",
+        content_hash=hashing.content_hash({"t": 1}),
+    )
+    await mk_source_fact(conn, "t:buyout", "after 25 years", doc)
+
+    r = await report.gather(pool, "t-client")
+
+    assert r.dangling == []          # no file is the normal state here
+    assert r.orphaned == []          # so the fact is not orphaned either
+    assert r.unattributed == []      # who + when are both recorded
+    assert r.total == 0
+
+
+async def test_testimony_without_who_or_when_is_flagged(conn):
+    """Undated, unattributed hearsay is the case the record exists to prevent."""
+    pool = FakePool(conn)
+    doc = await db.insert_entity(
+        conn, qname="t:src.someone-said", provenance_class="source", kind="document",
+        scope="client", owner="t-client",
+        value=json.dumps({"file": None, "date": None, "testimony": True}),
+        value_type="document", label="someone said something",
+        content_hash=hashing.content_hash({"t": 2}),
+    )
+    await mk_source_fact(conn, "t:rumour", 42, doc)
+
+    r = await report.gather(pool, "t-client")
+
+    assert len(r.unattributed) == 1
+    reason = r.unattributed[0][1]
+    assert "WHO" in reason and "WHEN" in reason

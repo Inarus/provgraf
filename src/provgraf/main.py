@@ -117,15 +117,33 @@ def add_doc(
     file: str = typer.Option("", "--file", help="path to the source file"),
     date: str = typer.Option("", "--date", help="document date YYYY-MM-DD"),
     scope: str = typer.Option("client", "--scope"),
-    owner: str = typer.Option("", "--owner", help="client slug (required when scope<>global)"),
+    owner: str = typer.Option("", "--owner", help="client slug (required unless scope=global)"),
     audience: str = typer.Option("client", "--audience"),
+    testimony: bool = typer.Option(False, "--testimony",
+                                   help="SPOKEN source (phone call, chat, meeting) — no file, by design"),
 ):
-    """Registers a source document as Entity(source, kind=document) + wasAttributedTo→agent."""
+    """Registers a source as Entity(source, kind=document) + wasAttributedTo→agent.
+
+    TWO SHAPES OF A CERTAIN SOURCE, with two different integrity conditions:
+    • file-backed — a resolution, a permit, a registry extract. The bank holds the original or a
+      copy of it, and the document carries its own recognition marks (signature, seal).
+      Integrity condition: THE FILE EXISTS.
+    • testimony (--testimony) — someone competent vouched that this is how it is. The message
+      travelled through a person, so there are no recognition marks; recording WHO and WHEN takes
+      their place. Integrity condition: A NAMED AGENT AND A DATE. Without them the chain of
+      provenance does not start anywhere identifiable, and that is not a source but hearsay.
+
+    The point of the second shape is mundane and important: people who tell you things change
+    their minds. A dated, attributed record of what you were assured of — and by whom — is what
+    lets you stop relitigating the same question.
+    """
     qname.validate(dqname)
-    asyncio.run(_add_doc(dqname, by, label, file, date, scope, owner, audience))
+    if testimony and not date:
+        _err("--testimony requires --date (when the assurance was given) — without it there is no record")
+    asyncio.run(_add_doc(dqname, by, label, file, date, scope, owner, audience, testimony))
 
 
-async def _add_doc(dqname, by, label, file, date, scope, owner, audience):
+async def _add_doc(dqname, by, label, file, date, scope, owner, audience, testimony=False):
     s = _settings()
     pool = await db.create_pool(s.database_url)
     try:
@@ -134,6 +152,8 @@ async def _add_doc(dqname, by, label, file, date, scope, owner, audience):
             if agent_id is None:
                 _err(f"Agent '{by}' does not exist — add it: provgraf agent {by} ...")
             value = {"file": file or None, "date": date or None}
+            if testimony:
+                value["testimony"] = True
             eid = await db.insert_entity(
                 conn,
                 qname=dqname, provenance_class="source", kind="document",
@@ -144,7 +164,8 @@ async def _add_doc(dqname, by, label, file, date, scope, owner, audience):
             )
             if await db.entity_provenance_count(conn, eid) < 1:
                 _err("INV-1: document without provenance (no wasAttributedTo)")
-        console.print(f"[green]✓[/] document {dqname} (id={eid}) wasAttributedTo {by}")
+        kind_txt = "testimony" if testimony else "document"
+        console.print(f"[green]✓[/] {kind_txt} {dqname} (id={eid}) wasAttributedTo {by}")
     finally:
         await pool.close()
 
@@ -815,6 +836,8 @@ async def _check(client):
                 lambda x: f"{x[0]}  [dim]{x[1]}[/]")
         section("DANGLING-DOC (document without a file / file does not exist)", r.dangling, "red",
                 lambda x: f"{x[0]}  [dim]{x[1]}[/]")
+        section("TESTIMONY WITHOUT A RECORD (missing: who vouched / when)", r.unattributed, "red",
+                lambda x: f"{x[0]}  [dim]{x[1]}[/]")
         section("ORPHANED (a dangling doc is the fact's ONLY source)", r.orphaned, "red",
                 lambda x: f"{x['qname']}  [dim]{x['label'] or ''} ⟵ {', '.join(x['lost_sources'])}[/]")
 
@@ -915,6 +938,8 @@ async def _ingest(file, owner):
             dscope = doc.get("scope", "client")
             downer = None if dscope == "global" else owner
             dval = {"file": doc.get("file"), "date": doc.get("date")}
+            if doc.get("testimony"):
+                dval["testimony"] = True   # spoken source — integrity is who+when, not a file
             did = await db.insert_entity(
                 conn, qname=doc["qname"], provenance_class="source", kind="document",
                 scope=dscope, owner=downer, audience=doc.get("audience", "client"),

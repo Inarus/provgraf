@@ -12,6 +12,7 @@ PG agent analyst      --kind person       --name "Analyst (human curator)"
 PG agent claude-code  --kind software     --name "Claude Code"
 PG agent acme:office  --kind organization --name "Acme Community Housing — office"
 PG agent acme:council --kind organization --name "Riverside Town Council"
+PG agent acme:ceo-person --kind person --name "Jane Doe — CEO"
 
 echo "── Source documents ────────────────────────────────────"
 PG add-doc acme:src.registry     --by analyst      --owner "$OWNER" --label "Company registry extract" \
@@ -22,6 +23,9 @@ PG add-doc acme:src.resolution   --by acme:council --owner "$OWNER" --label "Cou
   --file examples/docs/resolution-29-226.md
 PG add-doc acme:src.rental-terms --by acme:office  --owner "$OWNER" --label "Rental terms (income thresholds)" \
   --file examples/docs/rental-terms.md
+# A spoken source: the CEO confirmed it on a call. No file — the record of who and when is the point.
+PG add-doc acme:src.ceo-call --by acme:ceo-person --owner "$OWNER" --date 2026-07-23 --testimony \
+  --label "Phone call with the CEO — buyout after 25 years, confirmed"
 
 echo "── Identity core (eager) ───────────────────────────────"
 PG add acme:company      --value "Acme Community Housing Ltd." --from acme:src.registry --type text --load eager --owner "$OWNER" --label "Company"
@@ -51,6 +55,10 @@ PG link acme:riverside.deposit@datasheet alternateOf acme:riverside.deposit@reso
 echo "── Sensitive data (audience=internal) ──────────────────"
 PG add acme:hillside.savings --value 415740 --from acme:src.datasheet --unit "EUR" \
   --audience internal --owner "$OWNER" --label "Design-cost saving (INTERNAL)"
+
+echo "── Testimony: a fact backed by a dated, attributed phone call ──"
+PG add acme:riverside.buyout --value "after 25 years, on application" --from acme:src.ceo-call \
+  --type text --owner "$OWNER" --label "Riverside — route to ownership"
 
 echo "── Freshness: income thresholds from 2023-12 (overdue) ──"
 PG add acme:income_thresholds --value "income criteria as of 2023-12" --from acme:src.rental-terms --type text \

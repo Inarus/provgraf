@@ -233,6 +233,8 @@ async def check(client: str | None = None) -> str:
     if client:
         sec("INCOMPLETE (required field missing or unconfirmed)", r.incomplete, lambda x: f"{x[0]}  {x[1]}")
     sec("DANGLING-DOC (no file / file gone)", r.dangling, lambda x: f"{x[0]}  ({x[1]})")
+    sec("TESTIMONY WITHOUT A RECORD (missing: who vouched / when)", r.unattributed,
+        lambda x: f"{x[0]}  ({x[1]})")
     sec("ORPHANED (a dangling doc is the fact's ONLY source)", r.orphaned,
         lambda x: f"{x['qname']}  ⟵ {', '.join(x['lost_sources'])}")
     out.append(f"  TOTAL NEEDING ATTENTION: {r.total}" if r.total else "  ✓ clean")

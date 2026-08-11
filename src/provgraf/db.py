@@ -466,8 +466,11 @@ async def documents(pool: asyncpg.Pool, owner: str | None = None) -> list[asyncp
     where = " AND ".join(clauses)
     async with pool.acquire() as conn:
         return await conn.fetch(
-            f"SELECT e.qname, e.value#>>'{{file}}' AS file, e.label FROM entity e "
-            f"WHERE {where} ORDER BY e.qname",
+            f"SELECT e.qname, e.value#>>'{{file}}' AS file, e.label, "
+            f"       e.value#>>'{{date}}' AS date, "
+            f"       coalesce((e.value#>>'{{testimony}}')::bool, false) AS testimony, "
+            f"       (SELECT a.qname FROM agent a WHERE a.id = e.attributed_to) AS issuer "
+            f"FROM entity e WHERE {where} ORDER BY e.qname",
             *args,
         )
 

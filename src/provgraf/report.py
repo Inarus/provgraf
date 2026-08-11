@@ -29,13 +29,14 @@ class Report:
     unresolved: list = field(default_factory=list)    # derivation over a disputed input
     incomplete: list = field(default_factory=list)    # missing required fields (needs client)
     dangling: list = field(default_factory=list)      # (qname, reason) — document without a file
+    unattributed: list = field(default_factory=list)  # (qname, reason) — testimony with no who/when
     orphaned: list = field(default_factory=list)      # fact whose ONLY source went missing
 
     @property
     def total(self) -> int:
         return (len(self.hard) + len(self.soft) + len(self.overdue) + len(self.disputed)
                 + len(self.unresolved) + len(self.incomplete) + len(self.dangling)
-                + len(self.orphaned))
+                + len(self.unattributed) + len(self.orphaned))
 
 
 async def gather(pool, client: str | None = None, root: Path | None = None) -> Report:
@@ -56,10 +57,22 @@ async def gather(pool, client: str | None = None, root: Path | None = None) -> R
             if g["suggestion"]:
                 for m in (g["canonical"], *g["alternates"]):
                     r.suggestions[m] = g["suggestion"]
+    # Two shapes of a certain source → two DIFFERENT integrity conditions (see add-doc's docstring):
+    #   file-backed — the bank holds the original/a copy, so check that the file is still there;
+    #   testimony   — the message came through a person, so check that WHO and WHEN are recorded.
+    # A testimony without a file is NOT a defect; a testimony without who/when is a fatal one.
     for d in await db.documents(pool, client):
         f = d.get("file")
-        if not f:
-            r.dangling.append((d["qname"], "no file path (file)"))
+        if d["testimony"]:
+            missing = []
+            if not d["issuer"]:
+                missing.append("no record of WHO vouched (no wasAttributedTo)")
+            if not d["date"]:
+                missing.append("no record of WHEN (no date)")
+            if missing:
+                r.unattributed.append((d["qname"], " + ".join(missing)))
+        elif not f:
+            r.dangling.append((d["qname"], "no file path (if this is a spoken source, use --testimony)"))
         elif f.startswith(REMOTE_URI_PREFIXES):
             continue  # remote URI — provenance lives off-disk, not checked here
         elif root is not None and not (root / f).exists():

@@ -8,6 +8,8 @@
 
 If you let an AI agent write client-facing documents, the model is not the risk — **the facts are**. A language model will happily "correct" a true, contract-grade number (a rent rate, a buyout rule, a share-capital figure) toward whatever the internet believes. In our real deployment, an overnight agent once tried to fix six verified facts to match plausible-but-wrong public sources.
 
+Not every certain fact arrives as a PDF. Plenty of what you are told is true and consequential — a director confirms on a call how a scheme works, and you act on it. People also change their minds. So a source here is either a document with a file, or a **testimony**: a dated, attributed record that on this day this person vouched for this. That is what lets you stop relitigating a settled question, and it is why the integrity check differs by shape rather than demanding a file for everything.
+
 There is a second, more mundane version of the same problem. An agent left to its own devices **dumps everything into Markdown files as it goes** — notes, half-verified numbers, copies of copies — with no validation at the door. If you're disciplined about your files, maybe you can live with that. If you're messy (I am), the workspace silently rots: three files disagree about the same number and none of them says where it came from. That was the actual trigger for building this.
 
 provgraf is the counter-measure: a small database of **atomic facts, each with provenance** (which official document it came from, who put it there, when), plus one mechanism you don't get from a notes file:
@@ -18,7 +20,7 @@ It cuts both ways: the validating write path keeps the human's workspace from ro
 
 ## The idea in 60 seconds
 
-- Facts are nodes (`entity`), documents are nodes, people/software are `agent`s, decisions are `activity`s — [W3C PROV](https://www.w3.org/TR/prov-dm/) core plus documented extensions (`provenance_class`, `entity_status`; PROV sanctions extension via `prov:type` subtyping).
+- Facts are nodes (`entity`), sources are nodes, people/software are `agent`s, decisions are `activity`s — [W3C PROV](https://www.w3.org/TR/prov-dm/) core plus documented extensions (`provenance_class`, `entity_status`; PROV sanctions extension via `prov:type` subtyping).
 - Derived facts (sums, report figures) link to their inputs via `wasDerivedFrom` and store an `inputs_hash` of the input values.
 - When a source fact is revised, a recursive SQL CTE walks the derivation graph and flags every transitively dependent fact as **stale** (measured: a 2-level cascade in ~2.5 ms).
 - Versioning is a single trick: `valid_to` + a partial unique index (`WHERE valid_to IS NULL`). That gives **as-of queries** over the bank's own history for free.
@@ -57,6 +59,7 @@ graph LR
 | **MCP server** | Read-only tools for AI agents (`list_facts`, `get_fact`, `search`, `precedents`, `check`) over stdio or SSE; lazy model loading + idle unload. **Writes stay CLI-only** — the architecture, not a prompt, enforces "no fact enters the bank without a human OK". |
 | **Agent write gating** | Even on the CLI, a revision made by an agent of `kind='software'` lands as `to_confirm` until a human runs `verify`. An agent may propose; it cannot silently change a verified number. |
 | **Shared-source guard** | `check` separates a missing source document from **ORPHANED** facts — those whose *only* source is that document. Facts backed by another live source are not flagged. |
+| **Two shapes of a certain source** | A file-backed document (resolution, permit, registry extract) is verified by the file still being there. A **testimony** — someone competent vouched for it on a call — has no file by design; what makes it a record is *who* and *when*, and `check` flags a testimony missing either. |
 | **Interop** | PROV-JSON export round-trips through the reference W3C [`prov`](https://github.com/trungdong/prov) library — covered by `tests/test_prov_export.py`, not just claimed |
 | **Dashboard** | Streamlit view: facts, graph, documents, gaps |
 | **One report, two renderers** | `report.gather()` computes `check` once; the CLI paints it and the MCP server serialises it. The human and the agent cannot end up looking at different states of the same bank. |
