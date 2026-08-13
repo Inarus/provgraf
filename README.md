@@ -138,6 +138,10 @@ Honest list (an adversarial code review ran before publishing; the notable lefto
 - **Query-time provenance** — recording which facts fed a particular answer or document (TrustGraph does this). Likely belongs in the application consuming the bank rather than in the engine.
 - **LLM-resolved contradictions and auto-repairing memory.** Both are well-trodden elsewhere and both defeat the point of a bank whose contents a human vouched for.
 
+## Working with it as an agent
+
+If you are an AI agent operating on this bank, read [`AGENTS.md`](./AGENTS.md) first: what you may read, what you may not write, and the two ways the machinery will stop you on purpose.
+
 ## License
 
 MIT
