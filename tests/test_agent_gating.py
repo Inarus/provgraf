@@ -61,3 +61,47 @@ async def _revise_in_tx(conn, monkeypatch, by, status=None):
 
     monkeypatch.setattr(m.db, "create_pool", _fake_pool)
     await m._revise("t:rent", 30, "t:doc.new", None, by=by, status=status)
+
+
+async def test_skip_existing_makes_adds_idempotent(conn, monkeypatch):
+    """Rebuild scripts get run more than once — `--skip-existing` must make the second pass a
+    no-op instead of hitting the partial unique index (a real failure, 2026-08-13).
+
+    Idempotence is per ENTITY, not per script block: a fact added to an existing block later
+    must still land, which is why an `if ! provgraf get <doc>` guard around a whole block is
+    not enough — it silently swallows the new fact.
+    """
+    from helpers import FakePool
+
+    import provgraf.main as m
+
+    async def _fake_pool(_url):
+        pool = FakePool(conn)
+
+        async def _close():
+            return None
+
+        pool.close = _close
+        return pool
+
+    monkeypatch.setattr(m.db, "create_pool", _fake_pool)
+    doc = await mk_doc(conn, qname="t:src.phonecall")
+    await db.upsert_agent(conn, "t:someone", "person", "Someone")
+
+    await m._add("t:fact", 1, "t:src.phonecall", "source", "confirmed", "number", "", "",
+                 "client", "t-client", "client", "lazy", None, 0, "", skip_existing=True)
+    await m._add("t:fact", 1, "t:src.phonecall", "source", "confirmed", "number", "", "",
+                 "client", "t-client", "client", "lazy", None, 0, "", skip_existing=True)
+    assert await conn.fetchval("SELECT count(*) FROM entity WHERE qname='t:fact'") == 1
+
+    # a new fact next to the existing one still lands (a block-level guard would drop it)
+    await m._add("t:fact2", 2, "t:src.phonecall", "source", "confirmed", "number", "", "",
+                 "client", "t-client", "client", "lazy", None, 0, "", skip_existing=True)
+    assert await conn.fetchval("SELECT count(*) FROM entity WHERE qname='t:fact2'") == 1
+
+    # revising to the value already in force creates no new version (no history noise)
+    await m._revise("t:fact", 1, "t:src.phonecall", None, by="t:someone", skip_existing=True)
+    assert await conn.fetchval("SELECT count(*) FROM entity WHERE qname='t:fact'") == 1
+    await m._revise("t:fact", 99, "t:src.phonecall", None, by="t:someone", skip_existing=True)
+    assert await conn.fetchval("SELECT count(*) FROM entity WHERE qname='t:fact'") == 2
+    assert doc  # document used as the source

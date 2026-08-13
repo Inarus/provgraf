@@ -59,6 +59,7 @@ graph LR
 | **MCP server** | Read-only tools for AI agents (`list_facts`, `get_fact`, `search`, `precedents`, `check`) over stdio or SSE; lazy model loading + idle unload. **Writes stay CLI-only** — the architecture, not a prompt, enforces "no fact enters the bank without a human OK". |
 | **Agent write gating** | Even on the CLI, a revision made by an agent of `kind='software'` lands as `to_confirm` until a human runs `verify`. An agent may propose; it cannot silently change a verified number. |
 | **Shared-source guard** | `check` separates a missing source document from **ORPHANED** facts — those whose *only* source is that document. Facts backed by another live source are not flagged. |
+| **Re-runnable writes** | `add`, `add-doc` and `revise` take `--skip-existing`, so a rebuild script can be run twice without hitting the unique index — and idempotence is per *entity*, not per script block, because a guard around a whole block silently swallows anything added to it later. |
 | **Two shapes of a certain source** | A file-backed document (resolution, permit, registry extract) is verified by the file still being there. A **testimony** — someone competent vouched for it on a call — has no file by design; what makes it a record is *who* and *when*, and `check` flags a testimony missing either. |
 | **Interop** | PROV-JSON export round-trips through the reference W3C [`prov`](https://github.com/trungdong/prov) library — covered by `tests/test_prov_export.py`, not just claimed |
 | **Dashboard** | Streamlit view: facts, graph, documents, gaps |

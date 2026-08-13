@@ -121,6 +121,9 @@ def add_doc(
     audience: str = typer.Option("client", "--audience"),
     testimony: bool = typer.Option(False, "--testimony",
                                    help="SPOKEN source (phone call, chat, meeting) — no file, by design"),
+    skip_existing: bool = typer.Option(False, "--skip-existing",
+                                       help="do nothing if this qname is already in the bank "
+                                            "(rebuild scripts get run more than once)"),
 ):
     """Registers a source as Entity(source, kind=document) + wasAttributedTo→agent.
 
@@ -140,14 +143,19 @@ def add_doc(
     qname.validate(dqname)
     if testimony and not date:
         _err("--testimony requires --date (when the assurance was given) — without it there is no record")
-    asyncio.run(_add_doc(dqname, by, label, file, date, scope, owner, audience, testimony))
+    asyncio.run(_add_doc(dqname, by, label, file, date, scope, owner, audience, testimony,
+                         skip_existing))
 
 
-async def _add_doc(dqname, by, label, file, date, scope, owner, audience, testimony=False):
+async def _add_doc(dqname, by, label, file, date, scope, owner, audience, testimony=False,
+                   skip_existing=False):
     s = _settings()
     pool = await db.create_pool(s.database_url)
     try:
         async with pool.acquire() as conn, conn.transaction():
+            if skip_existing and await db.entity_exists(conn, dqname):
+                console.print(f"[dim]·[/] {dqname} already in the bank — skipping")
+                return
             agent_id = await db.get_agent_id(conn, by)
             if agent_id is None:
                 _err(f"Agent '{by}' does not exist — add it: provgraf agent {by} ...")
@@ -192,6 +200,9 @@ def add(
     last_verified: str = typer.Option("", "--last-verified", help="YYYY-MM-DD"),
     world_from: str = typer.Option("", "--world-from", help="when the fact starts holding IN THE WORLD (YYYY-MM-DD)"),
     world_to: str = typer.Option("", "--world-to", help="when it stops holding in the world (YYYY-MM-DD)"),
+    skip_existing: bool = typer.Option(False, "--skip-existing",
+                                       help="do nothing if this qname is already in the bank "
+                                            "(rebuild scripts get run more than once)"),
 ):
     """Adds a fact (source by default) with wasDerivedFrom→document provenance."""
     qname.validate(fqname)
@@ -201,16 +212,20 @@ def add(
         fqname, _parse_value(value), from_doc, pclass, status, vtype, unit, label,
         scope, owner, audience, load, note, verify_days, last_verified,
         _parse_at(world_from) if world_from else None, _parse_at(world_to) if world_to else None,
+        skip_existing,
     ))
 
 
 async def _add(fqname, value, from_doc, pclass, status, vtype, unit, label,
                scope, owner, audience, load, note, verify_days, last_verified,
-               world_from=None, world_to=None):
+               world_from=None, world_to=None, skip_existing=False):
     s = _settings()
     pool = await db.create_pool(s.database_url)
     try:
         async with pool.acquire() as conn, conn.transaction():
+            if skip_existing and await db.entity_exists(conn, fqname):
+                console.print(f"[dim]·[/] {fqname} already in the bank — skipping")
+                return
             doc = await db.get_entity(conn, from_doc)
             if doc is None:
                 _err(f"Source document '{from_doc}' does not exist (run add-doc first)")
@@ -364,6 +379,8 @@ def revise(
     world_from: str = typer.Option("", "--world-from",
                                    help="when the NEW value starts holding in the world (YYYY-MM-DD)"),
     world_to: str = typer.Option("", "--world-to", help="when it stops holding in the world (YYYY-MM-DD)"),
+    skip_existing: bool = typer.Option(False, "--skip-existing",
+                                       help="do nothing if the current version already holds this value"),
 ):
     """Revises a source fact: closes the old version (valid_to), creates a new one with subtype=Revision.
     A revision by an agent of kind=software without an explicit --status lands as to_confirm
@@ -372,11 +389,11 @@ def revise(
         _check_in("status", status, STATUSES)
     asyncio.run(_revise(fqname, _parse_value(value), from_doc, note or None, by, status or None,
                         _parse_at(world_from) if world_from else None,
-                        _parse_at(world_to) if world_to else None))
+                        _parse_at(world_to) if world_to else None, skip_existing))
 
 
 async def _revise(fqname, value, from_doc, note, by="analyst", status=None,
-                  world_from=None, world_to=None):
+                  world_from=None, world_to=None, skip_existing=False):
     s = _settings()
     pool = await db.create_pool(s.database_url)
     try:
@@ -384,13 +401,16 @@ async def _revise(fqname, value, from_doc, note, by="analyst", status=None,
             old = await conn.fetchrow(
                 """
                     SELECT id, provenance_class, scope, owner, load, audience,
-                           value_type, unit, label
+                           value_type, unit, label, content_hash
                     FROM entity WHERE qname=$1 AND valid_to IS NULL
                     """,
                 fqname,
             )
             if old is None:
                 _err(f"Fact '{fqname}' does not exist (no current version)")
+            if skip_existing and old["content_hash"] == hashing.content_hash(value):
+                console.print(f"[dim]·[/] {fqname} already holds this value — skipping the revision")
+                return
             doc = await db.get_entity(conn, from_doc)
             if doc is None:
                 _err(f"New document '{from_doc}' does not exist")
